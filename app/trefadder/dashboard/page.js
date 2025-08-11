@@ -357,3 +357,4 @@ function Card({ title, children, style }){
       {children}
     </div>
   );
+}
