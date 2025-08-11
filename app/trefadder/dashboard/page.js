@@ -332,4 +332,152 @@ export default function Page() {
         {/* KPIs */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))', gap:16, marginTop:16 }}>
           <KPI label="Total Reach" value={fmt.num(total.org + total.paid)} sub={delta(total.org + total.paid, (prevTotal.org + prevTotal.paid) || 0) || `${fmt.num(total.org)} organic · ${fmt.num(total.paid)} paid`} />
-          <KPI label="Impressions" val
+          <KPI label="Impressions" value={fmt.num(total.impr)} sub={delta(total.impr, prevTotal.impr) || `CTR ${fmt.pct(ctr)}`} />
+          <KPI label="Spend" value={fmt.cur(total.spend)} sub={delta(total.spend, prevTotal.spend) || `CPC ${fmt.cur(cpc)} · CPM ${fmt.cur(cpm)}`} />
+          <KPI label="Website" value={fmt.num(total.sessions)} sub={delta(total.sessions, prevTotal.sessions) || `${fmt.num(total.conv)} conv · CR ${fmt.pct(cr)}`} />
+        </div>
+
+        {/* Charts */}
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:16, marginTop:16 }}>
+          <Card title="Reach over time (stacked)">
+            <div style={{ height:300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={series} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickMargin={8} />
+                  <YAxis />
+                  <Tooltip formatter={(v)=> typeof v==='number' ? v.toLocaleString() : v} />
+                  <Legend />
+                  <Area type="monotone" dataKey="organicReach" name="Organic" stackId="1" strokeWidth={2} />
+                  <Area type="monotone" dataKey="paidReach" name="Paid" stackId="1" strokeWidth={2} />
+                  {compare && <Line type="monotone" dataKey="prevReach" name="Prev period (total reach)" strokeDasharray="4 4" strokeWidth={2} dot={false} />}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Sessions & Conversions (GA4)">
+            <div style={{ height:300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series} margin={{ left:8, right:8, top:8, bottom:0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickMargin={8} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="sessions" name="Sessions" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="conversions" name="Conversions" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                  {compare && <>
+                    <Line type="monotone" dataKey="prevSessions" name="Prev Sessions" strokeWidth={2} dot={false} strokeDasharray="3 3" />
+                    <Line type="monotone" dataKey="prevConversions" name="Prev Conversions" strokeWidth={2} dot={false} strokeDasharray="2 6" />
+                  </>}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:16, marginTop:16 }}>
+          <Card title="Impressions, Clicks & Spend">
+            <div style={{ height:300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={series} margin={{ left:8, right:8, top:8, bottom:0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickMargin={8} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="impressions" name="Impressions" stackId="a" />
+                  <Bar dataKey="clicks" name="Clicks" stackId="a" />
+                  <Bar dataKey="spend" name="Spend" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Traffic by Source (GA4)">
+            <div style={{ height:300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={trafficBySource} dataKey="sessions" nameKey="source" innerRadius={50} outerRadius={90}>
+                    {trafficBySource.map((_, i) => <Cell key={i} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        {/* Account breakdown (simple) */}
+        <Card title="Account breakdown (LinkedIn)" style={{ marginTop:16 }}>
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead style={{ color:'#6b7280', textAlign:'left' }}>
+                <tr>
+                  <th style={{ padding:'8px 12px' }}>Account</th>
+                  <th style={{ padding:'8px 12px' }}>Type</th>
+                  <th style={{ padding:'8px 12px' }}>Reach (Org)</th>
+                  <th style={{ padding:'8px 12px' }}>Reach (Paid)</th>
+                  <th style={{ padding:'8px 12px' }}>Impr.</th>
+                  <th style={{ padding:'8px 12px' }}>Clicks</th>
+                  <th style={{ padding:'8px 12px' }}>Engagements</th>
+                  <th style={{ padding:'8px 12px' }}>Spend</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.filter(a=>selected.includes(a.id)).map(a => {
+                  const series = (liByAccount[a.id] || []);
+                  const sum = series.reduce((acc, d) => ({
+                    org: acc.org + d.organicReach,
+                    paid: acc.paid + d.paidReach,
+                    impr: acc.impr + d.impressions,
+                    clicks: acc.clicks + d.clicks,
+                    eng: acc.eng + d.engagements,
+                    spend: acc.spend + d.spend,
+                  }), { org:0, paid:0, impr:0, clicks:0, eng:0, spend:0 });
+                  return (
+                    <tr key={a.id} style={{ borderTop:'1px solid #e5e7eb' }}>
+                      <td style={{ padding:'8px 12px', fontWeight:600 }}>{a.name}</td>
+                      <td style={{ padding:'8px 12px' }}>{a.type}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt.num(sum.org)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt.num(sum.paid)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt.num(sum.impr)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt.num(sum.clicks)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt.num(sum.eng)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt.cur(sum.spend)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <div style={{ color:'#6b7280', fontSize:12, marginTop:12 }}>
+          <b>How to connect real data:</b> swap the <code>fetchLinkedInSeries</code> and <code>fetchGA4Series</code> functions for API routes that return the same shape.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// tiny presentational components
+function KPI({ label, value, sub }) {
+  return (
+    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:16 }}>
+      <div style={{ color:'#6b7280', fontSize:12, marginBottom:6 }}>{label}</div>
+      <div style={{ fontSize:28, fontWeight:700 }}>{value}</div>
+      {sub ? <div style={{ color:'#6b7280', fontSize:12, marginTop:4 }}>{sub}</div> : null}
+    </div>
+  );
+}
+function Card({ title, children, style }) {
+  return (
+    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:16, ...style }}>
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
