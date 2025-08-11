@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis, Pie, PieChart, Cell
 } from 'recharts';
 
-// ---------- helpers ----------
+/* ========= helpers (unchanged logic) ========= */
 const fmt = {
   num: (n) => (Math.round(n)).toLocaleString(),
   pct: (n) => `${(n * 100).toFixed(1)}%`,
@@ -92,19 +92,50 @@ function genSeries(days, mix) {
 
 // mock fetching (replace later with API calls)
 async function fetchLinkedInSeries(accountIds, len) {
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 150));
   const out = {};
   accountIds.forEach((id, i) => { out[id] = genSeries(len, i + 1); });
   return out;
 }
 async function fetchGA4Series(len) {
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 150));
   return genSeries(len, 2).map(d => ({
     date: d.date, sessions: d.sessions, conversions: d.conversions, source: d.source,
     organicReach: d.organicReach, paidReach: d.paidReach, impressions: d.impressions,
     engagements: d.engagements, clicks: d.clicks, spend: d.spend,
   }));
 }
+
+/* ========= invisu-style theme tokens ========= */
+const THEME = {
+  pageBg: '#EFEDE7',  // warm beige
+  text: '#0A0A0A',
+  muted: '#6B6B6B',
+  card: '#FFFFFF',
+  border: '#E7E2DA',
+  radius: 20,
+  maxw: 1180,
+};
+const pill = {
+  base: {
+    padding: '10px 16px',
+    borderRadius: 999,
+    border: `1px solid ${THEME.border}`,
+    background: '#0A0A0A',
+    color: '#fff',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  outline: {
+    padding: '10px 16px',
+    borderRadius: 999,
+    border: `1px solid ${THEME.border}`,
+    background: '#fff',
+    color: THEME.text,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+};
 
 export default function Page() {
   const [accounts] = useState([
@@ -153,7 +184,7 @@ export default function Page() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [preset, selected, manualStart, manualEnd, compare]);
 
-  // aggregate current LI
+  // aggregate LI current
   const liAgg = useMemo(() => {
     const byDate = {};
     Object.keys(liByAccount).forEach(id => {
@@ -243,474 +274,262 @@ export default function Page() {
     return Object.values(by).sort((a,b)=>b.sessions-a.sessions);
   }, [ga4]);
 
-/* ===== invisu-style theme tokens ===== */
-const THEME = {
-  pageBg: "#EFEDE7",     // warm beige
-  text: "#0A0A0A",       // near-black
-  muted: "#6B6B6B",
-  card: "#FFFFFF",
-  border: "#E7E2DA",
-  radius: 20,
-  maxw: 1180,
-};
+  const exportCSV = () => {
+    const rows = series.map(d => ({
+      date:d.date, organicReach:d.organicReach, paidReach:d.paidReach, impressions:d.impressions,
+      clicks:d.clicks, engagements:d.engagements, spend:d.spend, sessions:d.sessions||0, conversions:d.conversions||0,
+      prevReach:d.prevReach||0, prevSessions:d.prevSessions||0, prevConversions:d.prevConversions||0
+    }));
+    downloadFile('dashboard_timeseries.csv', toCSV(rows));
+  };
 
-const pill = {
-  base: {
-    padding: "10px 16px",
-    borderRadius: 999,
-    border: `1px solid ${THEME.border}`,
-    background: "#0A0A0A",
-    color: "#fff",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  outline: {
-    padding: "10px 16px",
-    borderRadius: 999,
-    border: `1px solid ${THEME.border}`,
-    background: "#fff",
-    color: THEME.text,
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-};
+  const delta = (cur, prev) => {
+    if (!compare || !prev) return null;
+    if (prev === 0) return null;
+    const d = ((cur - prev) / prev) * 100;
+    const sign = d >= 0 ? '▲' : '▼';
+    return `${sign} ${Math.abs(d).toFixed(1)}% vs prev`;
+  };
 
-return (
-  <div
-    style={{
-      minHeight: "100vh",
-      background: THEME.pageBg,
-      color: THEME.text,
-      fontFamily:
-        "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
-    }}
-  >
-    <div style={{ maxWidth: THEME.maxw, margin: "0 auto", padding: "28px 20px" }}>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 16,
-          marginBottom: 18,
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 44,
-              lineHeight: 1.04,
-              letterSpacing: "-0.02em",
-              fontWeight: 800,
-            }}
-          >
-            Marketing & content der spiller.
-          </h1>
-          <div style={{ color: THEME.muted, marginTop: 6 }}>
-            LinkedIn (organic + paid) · Website (GA4)
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={exportCSV} style={pill.outline}>
-            Export CSV
-          </button>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div
-        style={{
-          background: THEME.card,
-          border: `1px solid ${THEME.border}`,
-          borderRadius: THEME.radius,
-          padding: 18,
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 18,
-          }}
-        >
-          {/* Left: date + compare */}
-          <div>
-            <div style={{ marginBottom: 10, color: THEME.muted, fontWeight: 600 }}>
-              Date range
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              {presets.map((p) => {
-                const active = !manualStart && preset.key === p.key;
-                return (
-                  <button
-                    key={p.key}
-                    onClick={() => {
-                      setPreset(p);
-                      setManualStart("");
-                      setManualEnd("");
-                    }}
-                    style={{
-                      ...(active ? pill.base : pill.outline),
-                      marginRight: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div
-              style={{ marginTop: 6, display: "flex", gap: 10, alignItems: "center" }}
-            >
-              <input
-                type="date"
-                value={manualStart}
-                onChange={(e) => setManualStart(e.target.value)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 999,
-                  border: `1px solid ${THEME.border}`,
-                  background: "#fff",
-                }}
-              />
-              <span style={{ color: THEME.muted }}>to</span>
-              <input
-                type="date"
-                value={manualEnd}
-                onChange={(e) => setManualEnd(e.target.value)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 999,
-                  border: `1px solid ${THEME.border}`,
-                  background: "#fff",
-                }}
-              />
-              <button
-                onClick={load}
-                disabled={!manualStart || !manualEnd}
-                style={{
-                  ...(manualStart && manualEnd ? pill.base : pill.outline),
-                  opacity: manualStart && manualEnd ? 1 : 0.7,
-                }}
-              >
-                Apply
-              </button>
-
-              <label style={{ marginLeft: 10, color: THEME.text }}>
-                <input
-                  type="checkbox"
-                  checked={compare}
-                  onChange={(e) => setCompare(e.target.checked)}
-                  style={{ marginRight: 6 }}
-                />
-                Compare to previous period
-              </label>
-            </div>
-          </div>
-
-          {/* Right: accounts */}
-          <div>
-            <div style={{ marginBottom: 10, color: THEME.muted, fontWeight: 600 }}>
-              Accounts
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              {accounts.map((a) => {
-                const checked = selected.includes(a.id);
-                return (
-                  <label
-                    key={a.id}
-                    style={{
-                      ...(checked ? pill.base : pill.outline),
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) =>
-                        setSelected((prev) =>
-                          e.target.checked ? [...prev, a.id] : prev.filter((x) => x !== a.id)
-                        )
-                      }
-                      style={{ display: "none" }}
-                    />
-                    {a.name} · {a.type}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-          gap: 18,
-          marginTop: 18,
-        }}
-      >
-        <KPI
-          label="Total Reach"
-          value={fmt.num(total.org + total.paid)}
-          sub={
-            delta(total.org + total.paid, (prevTotal.org + prevTotal.paid) || 0) ||
-            `${fmt.num(total.org)} organic · ${fmt.num(total.paid)} paid`
-          }
-        />
-        <KPI
-          label="Impressions"
-          value={fmt.num(total.impr)}
-          sub={delta(total.impr, prevTotal.impr) || `CTR ${fmt.pct(ctr)}`}
-        />
-        <KPI
-          label="Spend"
-          value={fmt.cur(total.spend)}
-          sub={
-            delta(total.spend, prevTotal.spend) ||
-            `CPC ${fmt.cur(cpc)} · CPM ${fmt.cur(cpm)}`
-          }
-        />
-        <KPI
-          label="Website"
-          value={fmt.num(total.sessions)}
-          sub={
-            delta(total.sessions, prevTotal.sessions) ||
-            `${fmt.num(total.conv)} conv · CR ${fmt.pct(cr)}`
-          }
-        />
-      </div>
-
-      {/* Charts row 1 */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "2fr 1fr",
-          gap: 18,
-          marginTop: 18,
-        }}
-      >
-        <Card title="Reach over time (stacked)">
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickMargin={8} />
-                <YAxis />
-                <Tooltip formatter={(v) => (typeof v === "number" ? v.toLocaleString() : v)} />
-                <Legend />
-                <Area type="monotone" dataKey="organicReach" name="Organic" stackId="1" strokeWidth={2} />
-                <Area type="monotone" dataKey="paidReach" name="Paid" stackId="1" strokeWidth={2} />
-                {compare && (
-                  <Line
-                    type="monotone"
-                    dataKey="prevReach"
-                    name="Prev period (total reach)"
-                    strokeDasharray="4 4"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                )}
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        <Card title="Sessions & Conversions (GA4)">
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={series} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickMargin={8} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="sessions" name="Sessions" strokeWidth={2} dot={false} />
-                <Line
-                  type="monotone"
-                  dataKey="conversions"
-                  name="Conversions"
-                  strokeDasharray="4 4"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                {compare && (
-                  <>
-                    <Line
-                      type="monotone"
-                      dataKey="prevSessions"
-                      name="Prev Sessions"
-                      strokeWidth={2}
-                      dot={false}
-                      strokeDasharray="3 3"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="prevConversions"
-                      name="Prev Conversions"
-                      strokeWidth={2}
-                      dot={false}
-                      strokeDasharray="2 6"
-                    />
-                  </>
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-
-      {/* Charts row 2 */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "2fr 1fr",
-          gap: 18,
-          marginTop: 18,
-        }}
-      >
-        <Card title="Impressions, Clicks & Spend">
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={series} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickMargin={8} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="impressions" name="Impressions" stackId="a" />
-                <Bar dataKey="clicks" name="Clicks" stackId="a" />
-                <Bar dataKey="spend" name="Spend" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        <Card title="Traffic by Source (GA4)">
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={trafficBySource}
-                  dataKey="sessions"
-                  nameKey="source"
-                  innerRadius={50}
-                  outerRadius={90}
-                >
-                  {trafficBySource.map((_, i) => (
-                    <Cell key={i} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-
-      {/* Table */}
-      <Card title="Account breakdown (LinkedIn)" style={{ marginTop: 18 }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead style={{ color: THEME.muted, textAlign: "left" }}>
-              <tr>
-                <th style={{ padding: "10px 12px" }}>Account</th>
-                <th style={{ padding: "10px 12px" }}>Type</th>
-                <th style={{ padding: "10px 12px" }}>Reach (Org)</th>
-                <th style={{ padding: "10px 12px" }}>Reach (Paid)</th>
-                <th style={{ padding: "10px 12px" }}>Impr.</th>
-                <th style={{ padding: "10px 12px" }}>Clicks</th>
-                <th style={{ padding: "10px 12px" }}>Engagements</th>
-                <th style={{ padding: "10px 12px" }}>Spend</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts
-                .filter((a) => selected.includes(a.id))
-                .map((a) => {
-                  const series = liByAccount[a.id] || [];
-                  const sum = series.reduce(
-                    (acc, d) => ({
-                      org: acc.org + d.organicReach,
-                      paid: acc.paid + d.paidReach,
-                      impr: acc.impr + d.impressions,
-                      clicks: acc.clicks + d.clicks,
-                      eng: acc.eng + d.engagements,
-                      spend: acc.spend + d.spend,
-                    }),
-                    { org: 0, paid: 0, impr: 0, clicks: 0, eng: 0, spend: 0 }
-                  );
-                  return (
-                    <tr key={a.id} style={{ borderTop: `1px solid ${THEME.border}` }}>
-                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>{a.name}</td>
-                      <td style={{ padding: "10px 12px" }}>{a.type}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmt.num(sum.org)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmt.num(sum.paid)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmt.num(sum.impr)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmt.num(sum.clicks)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmt.num(sum.eng)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmt.cur(sum.spend)}</td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <div style={{ color: THEME.muted, fontSize: 12, marginTop: 12 }}>
-        <b>How to connect real data:</b> swap the <code>fetchLinkedInSeries</code> and{" "}
-        <code>fetchGA4Series</code> functions for API routes that return the same shape.
-      </div>
-    </div>
-  </div>
-);
-
-/* ===== tiny presentational comps with invisu styling ===== */
-function KPI({ label, value, sub }) {
+  /* ======== RENDER (invisu style) ======== */
   return (
     <div
       style={{
-        background: THEME.card,
-        border: `1px solid ${THEME.border}`,
-        borderRadius: THEME.radius,
-        padding: 18,
+        minHeight: '100vh',
+        background: THEME.pageBg,
+        color: THEME.text,
+        fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
       }}
     >
-      <div style={{ color: THEME.muted, fontSize: 12, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em" }}>{value}</div>
-      {sub ? (
-        <div style={{ color: THEME.muted, fontSize: 12, marginTop: 6 }}>{sub}</div>
-      ) : null}
+      <div style={{ maxWidth: THEME.maxw, margin: '0 auto', padding: '28px 20px' }}>
+        {/* Header */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:16, marginBottom:18 }}>
+          <div>
+            <h1 style={{ margin:0, fontSize:44, lineHeight:1.04, letterSpacing:'-0.02em', fontWeight:800 }}>
+              Marketing & content der spiller.
+            </h1>
+            <div style={{ color: THEME.muted, marginTop:6 }}>
+              LinkedIn (organic + paid) · Website (GA4)
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={exportCSV} style={pill.outline}>Export CSV</button>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div style={{ background: THEME.card, border:`1px solid ${THEME.border}`, borderRadius: THEME.radius, padding:18 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+            {/* Date + compare */}
+            <div>
+              <div style={{ marginBottom:10, color: THEME.muted, fontWeight:600 }}>Date range</div>
+              <div style={{ marginBottom:10 }}>
+                {presets.map(p => {
+                  const active = !manualStart && preset.key===p.key;
+                  return (
+                    <button
+                      key={p.key}
+                      onClick={()=>{ setPreset(p); setManualStart(''); setManualEnd(''); }}
+                      style={{ ...(active ? pill.base : pill.outline), marginRight:8, marginBottom:8 }}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:6, display:'flex', gap:10, alignItems:'center' }}>
+                <input type="date" value={manualStart} onChange={e=>setManualStart(e.target.value)}
+                       style={{ padding:'10px 14px', borderRadius:999, border:`1px solid ${THEME.border}`, background:'#fff' }} />
+                <span style={{ color: THEME.muted }}>to</span>
+                <input type="date" value={manualEnd} onChange={e=>setManualEnd(e.target.value)}
+                       style={{ padding:'10px 14px', borderRadius:999, border:`1px solid ${THEME.border}`, background:'#fff' }} />
+                <button onClick={load} disabled={!manualStart || !manualEnd}
+                        style={{ ...(manualStart && manualEnd ? pill.base : pill.outline), opacity: manualStart && manualEnd ? 1 : 0.7 }}>
+                  Apply
+                </button>
+                <label style={{ marginLeft:10, color: THEME.text }}>
+                  <input type="checkbox" checked={compare} onChange={e=>setCompare(e.target.checked)} style={{ marginRight:6 }} />
+                  Compare to previous period
+                </label>
+              </div>
+            </div>
+
+            {/* Accounts */}
+            <div>
+              <div style={{ marginBottom:10, color: THEME.muted, fontWeight:600 }}>Accounts</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+                {accounts.map(a => {
+                  const checked = selected.includes(a.id);
+                  return (
+                    <label key={a.id}
+                      style={{ ...(checked ? pill.base : pill.outline), display:'inline-flex', alignItems:'center', gap:8 }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => setSelected(prev => e.target.checked ? [...prev, a.id] : prev.filter(x => x !== a.id))}
+                        style={{ display:'none' }}
+                      />
+                      {a.name} · {a.type}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* KPIs */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))', gap:18, marginTop:18 }}>
+          <KPI label="Total Reach" value={fmt.num(total.org + total.paid)}
+               sub={delta(total.org + total.paid, (prevTotal.org + prevTotal.paid) || 0) || `${fmt.num(total.org)} organic · ${fmt.num(total.paid)} paid`} />
+          <KPI label="Impressions" value={fmt.num(total.impr)} sub={delta(total.impr, prevTotal.impr) || `CTR ${fmt.pct(ctr)}`} />
+          <KPI label="Spend" value={fmt.cur(total.spend)} sub={delta(total.spend, prevTotal.spend) || `CPC ${fmt.cur(cpc)} · CPM ${fmt.cur(cpm)}`} />
+          <KPI label="Website" value={fmt.num(total.sessions)} sub={delta(total.sessions, prevTotal.sessions) || `${fmt.num(total.conv)} conv · CR ${fmt.pct(cr)}`} />
+        </div>
+
+        {/* Charts row 1 */}
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:18, marginTop:18 }}>
+          <Card title="Reach over time (stacked)">
+            <div style={{ height:300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={series} margin={{ left:8, right:8, top:8, bottom:0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickMargin={8} />
+                  <YAxis />
+                  <Tooltip formatter={(v)=> typeof v==='number' ? v.toLocaleString() : v} />
+                  <Legend />
+                  <Area type="monotone" dataKey="organicReach" name="Organic" stackId="1" strokeWidth={2} />
+                  <Area type="monotone" dataKey="paidReach" name="Paid" stackId="1" strokeWidth={2} />
+                  {compare && <Line type="monotone" dataKey="prevReach" name="Prev period (total reach)" strokeDasharray="4 4" strokeWidth={2} dot={false} />}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Sessions & Conversions (GA4)">
+            <div style={{ height:300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series} margin={{ left:8, right:8, top:8, bottom:0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickMargin={8} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="sessions" name="Sessions" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="conversions" name="Conversions" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                  {compare && <>
+                    <Line type="monotone" dataKey="prevSessions" name="Prev Sessions" strokeWidth={2} dot={false} strokeDasharray="3 3" />
+                    <Line type="monotone" dataKey="prevConversions" name="Prev Conversions" strokeWidth={2} dot={false} strokeDasharray="2 6" />
+                  </>}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        {/* Charts row 2 */}
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:18, marginTop:18 }}>
+          <Card title="Impressions, Clicks & Spend">
+            <div style={{ height:300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={series} margin={{ left:8, right:8, top:8, bottom:0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickMargin={8} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="impressions" name="Impressions" stackId="a" />
+                  <Bar dataKey="clicks" name="Clicks" stackId="a" />
+                  <Bar dataKey="spend" name="Spend" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Traffic by Source (GA4)">
+            <div style={{ height:300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={trafficBySource} dataKey="sessions" nameKey="source" innerRadius={50} outerRadius={90}>
+                    {trafficBySource.map((_, i) => <Cell key={i} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        {/* Table */}
+        <Card title="Account breakdown (LinkedIn)" style={{ marginTop:18 }}>
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead style={{ color: THEME.muted, textAlign:'left' }}>
+                <tr>
+                  <th style={{ padding:'10px 12px' }}>Account</th>
+                  <th style={{ padding:'10px 12px' }}>Type</th>
+                  <th style={{ padding:'10px 12px' }}>Reach (Org)</th>
+                  <th style={{ padding:'10px 12px' }}>Reach (Paid)</th>
+                  <th style={{ padding:'10px 12px' }}>Impr.</th>
+                  <th style={{ padding:'10px 12px' }}>Clicks</th>
+                  <th style={{ padding:'10px 12px' }}>Engagements</th>
+                  <th style={{ padding:'10px 12px' }}>Spend</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.filter(a=>selected.includes(a.id)).map(a => {
+                  const s = (liByAccount[a.id] || []);
+                  const sum = s.reduce((acc, d) => ({
+                    org: acc.org + d.organicReach,
+                    paid: acc.paid + d.paidReach,
+                    impr: acc.impr + d.impressions,
+                    clicks: acc.clicks + d.clicks,
+                    eng: acc.eng + d.engagements,
+                    spend: acc.spend + d.spend,
+                  }), { org:0, paid:0, impr:0, clicks:0, eng:0, spend:0 });
+                  return (
+                    <tr key={a.id} style={{ borderTop:`1px solid ${THEME.border}` }}>
+                      <td style={{ padding:'10px 12px', fontWeight:600 }}>{a.name}</td>
+                      <td style={{ padding:'10px 12px' }}>{a.type}</td>
+                      <td style={{ padding:'10px 12px' }}>{fmt.num(sum.org)}</td>
+                      <td style={{ padding:'10px 12px' }}>{fmt.num(sum.paid)}</td>
+                      <td style={{ padding:'10px 12px' }}>{fmt.num(sum.impr)}</td>
+                      <td style={{ padding:'10px 12px' }}>{fmt.num(sum.clicks)}</td>
+                      <td style={{ padding:'10px 12px' }}>{fmt.num(sum.eng)}</td>
+                      <td style={{ padding:'10px 12px' }}>{fmt.cur(sum.spend)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <div style={{ color: THEME.muted, fontSize:12, marginTop:12 }}>
+          <b>How to connect real data:</b> swap the <code>fetchLinkedInSeries</code> and <code>fetchGA4Series</code> functions for API routes that return the same shape.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========= tiny presentational comps with invisu styling ========= */
+function KPI({ label, value, sub }) {
+  return (
+    <div style={{ background: THEME.card, border:`1px solid ${THEME.border}`, borderRadius: THEME.radius, padding:18 }}>
+      <div style={{ color: THEME.muted, fontSize:12, marginBottom:6 }}>{label}</div>
+      <div style={{ fontSize:34, fontWeight:800, letterSpacing:'-0.02em' }}>{value}</div>
+      {sub ? <div style={{ color: THEME.muted, fontSize:12, marginTop:6 }}>{sub}</div> : null}
     </div>
   );
 }
 
 function Card({ title, children, style }) {
   return (
-    <div
-      style={{
-        background: THEME.card,
-        border: `1px solid ${THEME.border}`,
-        borderRadius: THEME.radius,
-        padding: 18,
-        ...style,
-      }}
-    >
-      <div style={{ fontWeight: 700, marginBottom: 10, letterSpacing: "-0.01em" }}>
-        {title}
-      </div>
+    <div style={{ background: THEME.card, border:`1px solid ${THEME.border}`, borderRadius: THEME.radius, padding:18, ...style }}>
+      <div style={{ fontWeight:700, marginBottom:10, letterSpacing:'-0.01em' }}>{title}</div>
       {children}
     </div>
   );
 }
-
