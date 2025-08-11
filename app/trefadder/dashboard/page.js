@@ -155,6 +155,45 @@ export default function Page(){
     return Object.values(by).sort((a,b)=>b.sessions-a.sessions);
   }, [ga4]);
 
+  const toLocalISO = d => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+};
+
+const datesRange = (startISO, endISO) => {
+  const start = new Date(startISO), end = new Date(endISO);
+  const out = [];
+  // lock to noon to avoid DST hops
+  for (let d = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12);
+       d <= new Date(end.getFullYear(), end.getMonth(), end.getDate(), 12);
+       d.setDate(d.getDate()+1)) {
+    out.push(toLocalISO(d));
+  }
+  return out;
+};
+
+const lastNDates = (n) => {
+  const out = [], end = new Date();
+  for (let i=n-1; i>=0; i--) {
+    const d = new Date(end.getFullYear(), end.getMonth(), end.getDate()-i, 12);
+    out.push(toLocalISO(d));
+  }
+  return out;
+};
+
+  const downloadFile = (name, text) => {
+  const b = new Blob([text], { type:'text/csv' });
+  const u = URL.createObjectURL(b);
+  const a = document.createElement('a');
+  a.href = u; a.download = name; document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(u), 0);
+};
+
+  
   const exportCSV = ()=> {
     const rows = series.map(d=>({
       date:d.date, organicReach:d.organicReach, paidReach:d.paidReach, impressions:d.impressions, clicks:d.clicks,
