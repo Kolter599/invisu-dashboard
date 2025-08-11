@@ -14,7 +14,7 @@ const nextConfig = {
           {
             key: "Content-Security-Policy",
             value:
-              "frame-ancestors 'self' https://*.framer.app https://invisu.dk https://www.invisu.dk https://*.vercel.app;",
+              "frame-ancestors 'self' https://*.framer.app https://invisu.dk https://www.invisu.dk https://*.vercel.app https://*.framer.website https://framer.com/ https://framer.com/projects/Invisu--nVkSluLhLqFsh75tdF7L-gZHWQ?node=KR6gNVT4A;",
           },
           // Old header some browsers still check. ALLOWALL is non-standard but widely honored.
           { key: "X-Frame-Options", value: "ALLOWALL" },
