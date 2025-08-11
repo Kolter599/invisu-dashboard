@@ -1,5 +1,4 @@
 export const metadata = { title: "Dashboard", description: "Marketing dashboard" };
-
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
