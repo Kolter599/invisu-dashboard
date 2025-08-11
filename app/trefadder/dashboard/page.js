@@ -15,20 +15,47 @@ const fmt = {
 const toCSV = (rows) => rows.length
   ? Object.keys(rows[0]).join(',') + '\n' + rows.map(r => Object.keys(rows[0]).map(k => JSON.stringify(r[k] ?? '')).join(',')).join('\n')
   : '';
-const downloadFile = (name, text) => { const b=new Blob([text],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); };
 
-const presets = [
-  { key:'last14', label:'Last 14 days', days:14 },
-  { key:'last30', label:'Last 30 days', days:30 },
-  { key:'last90', label:'Last 90 days', days:90 },
-];
+// ✅ Robust download helper (iOS/Safari friendly)
+const downloadFile = (name, text) => {
+  const b = new Blob([text], { type:'text/csv' });
+  const u = URL.createObjectURL(b);
+  const a = document.createElement('a');
+  a.href = u; a.download = name; document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(u), 0);
+};
+
+// ✅ Local-date helpers (avoid UTC/DST issues)
+const toLocalISO = d => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+};
 
 const datesRange = (startISO, endISO) => {
-  const start=new Date(startISO), end=new Date(endISO), out=[];
-  for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) out.push(new Date(d).toISOString().slice(0,10));
+  const start = new Date(startISO), end = new Date(endISO);
+  const out = [];
+  // lock to noon to avoid DST hops
+  for (let d = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12);
+       d <= new Date(end.getFullYear(), end.getMonth(), end.getDate(), 12);
+       d.setDate(d.getDate()+1)) {
+    out.push(toLocalISO(d));
+  }
   return out;
 };
-const lastNDates = (n) => { const out=[], end=new Date(); for (let i=n-1;i>=0;i--){ const d=new Date(end); d.setDate(end.getDate()-i); out.push(d.toISOString().slice(0,10)); } return out; };
+
+const lastNDates = (n) => {
+  const out = [], end = new Date();
+  for (let i=n-1; i>=0; i--) {
+    const d = new Date(end.getFullYear(), end.getMonth(), end.getDate()-i, 12);
+    out.push(toLocalISO(d));
+  }
+  return out;
+};
+
 const rng = (s)=>{ let x=Math.sin(s)*1e4; return ()=>{ x=Math.sin(x)*1e4; return x-Math.floor(x);} };
 const genSeries = (days, mix=1) => {
   const ds=lastNDates(days), r=rng(days*13+mix*7); let followers=1000+Math.round(r()*500);
@@ -155,45 +182,6 @@ export default function Page(){
     return Object.values(by).sort((a,b)=>b.sessions-a.sessions);
   }, [ga4]);
 
-  const toLocalISO = d => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-};
-
-const datesRange = (startISO, endISO) => {
-  const start = new Date(startISO), end = new Date(endISO);
-  const out = [];
-  // lock to noon to avoid DST hops
-  for (let d = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12);
-       d <= new Date(end.getFullYear(), end.getMonth(), end.getDate(), 12);
-       d.setDate(d.getDate()+1)) {
-    out.push(toLocalISO(d));
-  }
-  return out;
-};
-
-const lastNDates = (n) => {
-  const out = [], end = new Date();
-  for (let i=n-1; i>=0; i--) {
-    const d = new Date(end.getFullYear(), end.getMonth(), end.getDate()-i, 12);
-    out.push(toLocalISO(d));
-  }
-  return out;
-};
-
-  const downloadFile = (name, text) => {
-  const b = new Blob([text], { type:'text/csv' });
-  const u = URL.createObjectURL(b);
-  const a = document.createElement('a');
-  a.href = u; a.download = name; document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(u), 0);
-};
-
-  
   const exportCSV = ()=> {
     const rows = series.map(d=>({
       date:d.date, organicReach:d.organicReach, paidReach:d.paidReach, impressions:d.impressions, clicks:d.clicks,
@@ -397,3 +385,10 @@ function Card({ title, children, style }){
     </div>
   );
 }
+
+// Presets (kept at bottom to match original structure without reordering exports)
+const presets = [
+  { key:'last14', label:'Last 14 days', days:14 },
+  { key:'last30', label:'Last 30 days', days:30 },
+  { key:'last90', label:'Last 90 days', days:90 },
+];
