@@ -345,7 +345,9 @@ export default function Page() {
   };
 
   return (
-    <div className={`min-h-screen ${printMode ? "bg-white" : "bg-slate-50"}`}>
+    <div
+  className="min-h-screen"
+  style={{ backgroundColor: printMode ? "#FFFFFF" : "#EFEDE7" }}>
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
