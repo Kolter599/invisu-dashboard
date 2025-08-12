@@ -126,10 +126,10 @@ function generateDemoSeries(days: number, accountMix: number) {
 }
 
 const DEMO_ACCOUNTS: Account[] = [
-  { id: "pers_1", name: "Philip Treiner", type: "personal" },
-  { id: "pers_2", name: "Jesper Kring", type: "personal" },
-  { id: "pers_3", name: "Mia Lena", type: "personal" },
-  { id: "biz_1", name: "Valified (Company Page)", type: "business" },
+  { id: "pers_1", name: "Jens Mølbjer", type: "personal" },
+  { id: "pers_2", name: "Mie Levi Fenger", type: "personal" },
+  { id: "pers_3", name: "Sebastian Kolter", type: "personal" },
+  { id: "biz_1", name: "Trefadder Danmark A/S", type: "business" },
 ];
 
 async function fetchLinkedInSeries(accountIds: string[], days: number): Promise<Record<string, DailyPoint[]>> {
